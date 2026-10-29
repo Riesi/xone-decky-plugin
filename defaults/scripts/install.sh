@@ -419,11 +419,11 @@ load_modules() {
     fi
 
     # Load xpadneo
-    if ! lsmod | grep -q hid_xpadneo; then
-        modprobe hid_xpadneo || log_error "Failed to load hid_xpadneo module"
+    if ! lsmod | grep -q hid-xpadneo; then
+        modprobe hid-xpadneo || log_error "Failed to load hid-xpadneo module"
         
         # Set up autoload
-        echo "hid_xpadneo" > /etc/modules-load.d/hid_xpadneo.conf
+        echo "hid-xpadneo" > /etc/modules-load.d/hid-xpadneo.conf
     fi
     
     # Remove conflicting xpad.conf if exists
