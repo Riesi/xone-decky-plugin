@@ -374,7 +374,7 @@ install_xpadneo() {
     
     # Run the install script and capture output to check for errors
     local install_output install_exit_code=0
-    install_output=$(./install.sh --release 2>&1) || install_exit_code=$?
+    install_output=$(./install.sh 2>&1) || install_exit_code=$?
 
     # Check for kernel header mismatch error
     if echo "$install_output" | grep -q "Your kernel headers for kernel .* cannot be found"; then
