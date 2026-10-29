@@ -106,7 +106,7 @@ class Plugin:
                 env=env,
             )
             xpadneo_result = subprocess.run(
-                ["dkms", "status", "xpadneo"],
+                ["dkms", "status", "hid_xpadneo"],
                 capture_output=True,
                 text=True,
                 env=env,
