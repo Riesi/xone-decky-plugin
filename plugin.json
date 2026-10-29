@@ -5,7 +5,7 @@
         "root"
     ],
     "api_version": 1,
-    "version": "0.4.2",
+    "version": "0.4.3",
     "publish": {
         "tags": [
             "controller",

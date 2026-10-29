@@ -11,8 +11,8 @@ XPAD_NOONE_LOCAL_REPO="/home/deck/repos/xpad-noone"
 XONE_REMOTE_REPO="https://github.com/dlundqvist/xone"
 XPAD_NOONE_REMOTE_REPO="https://github.com/forkymcforkface/xpad-noone"
 XPAD_NOONE_VERSION="1.0"
-XPADNEO_LOCAL_REPO = "/home/deck/repos/xpadneo"
-XPADNEO_REMOTE_REPO = "https://github.com/atar-axis/xpadneo.git"
+XPADNEO_LOCAL_REPO="/home/deck/repos/xpadneo"
+XPADNEO_REMOTE_REPO="https://github.com/atar-axis/xpadneo.git"
 
 REQUIRED_PACKAGES=("curl" "wget" "git" "gcc" "cabextract" "dkms" "libisl" "libmpc" "plymouth" "bluez" "bluez-utils")
 
