@@ -11,8 +11,10 @@ XPAD_NOONE_LOCAL_REPO="/home/deck/repos/xpad-noone"
 XONE_REMOTE_REPO="https://github.com/dlundqvist/xone"
 XPAD_NOONE_REMOTE_REPO="https://github.com/forkymcforkface/xpad-noone"
 XPAD_NOONE_VERSION="1.0"
+XPADNEO_LOCAL_REPO = "/home/deck/repos/xpadneo"
+XPADNEO_REMOTE_REPO = "https://github.com/atar-axis/xpadneo.git"
 
-REQUIRED_PACKAGES=("curl" "wget" "git" "gcc" "cabextract" "dkms" "libisl" "libmpc" "plymouth")
+REQUIRED_PACKAGES=("curl" "wget" "git" "gcc" "cabextract" "dkms" "libisl" "libmpc" "plymouth" "bluez" "bluez-utils")
 
 # ============================================================================
 # Helper Functions
@@ -253,6 +255,36 @@ setup_xpad_noone_repo() {
     fi
 }
 
+# Clone or update xpadneo repo
+setup_xpadneo_repo() {
+    log_info "Setting up xpadneo repository..."
+    
+    if [ -d "$XPADNEO_LOCAL_REPO" ]; then
+        cd "$XPADNEO_LOCAL_REPO"
+        
+        # Check if using correct remote
+        local current_remote
+        current_remote=$(git remote get-url origin 2>/dev/null || echo "")
+        
+        if [ "$current_remote" != "$XPADNEO_REMOTE_REPO" ]; then
+            log_info "Switching to correct xpadneo fork..."
+            cd /home/deck/repos
+            rm -rf "$XPADNEO_LOCAL_REPO"
+            git clone "$XPADNEO_REMOTE_REPO" "$XPADNEO_LOCAL_REPO"
+        else
+            # Update existing repo
+            log_info "Updating xpadneo repository..."
+            git reset --hard >/dev/null 2>&1
+            git pull >/dev/null 2>&1 || true
+        fi
+    else
+        # Clone new
+        log_info "Cloning xpadneo repository..."
+        mkdir -p /home/deck/repos
+        git clone "$XPADNEO_REMOTE_REPO" "$XPADNEO_LOCAL_REPO"
+    fi
+}
+
 # Install xone driver
 install_xone() {
     if dkms status xone 2>/dev/null | grep -q "installed"; then
@@ -330,6 +362,42 @@ install_xpad_noone() {
     fi
 }
 
+# Install xpadneo driver
+install_xpadneo() {
+    if dkms status hid-xpadneo 2>/dev/null | grep -q "installed"; then
+        log_info "hid-xpadneo driver already installed"
+        return 0
+    fi
+    
+    log_info "Installing hid-xpadneo driver..."
+    cd "$XPADNEO_LOCAL_REPO"
+    
+    # Run the install script and capture output to check for errors
+    local install_output install_exit_code=0
+    install_output=$(./install.sh --release 2>&1) || install_exit_code=$?
+
+    # Check for kernel header mismatch error
+    if echo "$install_output" | grep -q "Your kernel headers for kernel .* cannot be found"; then
+        local mismatch_result=0
+        check_kernel_header_mismatch "$install_output" || mismatch_result=$?
+        if [ $mismatch_result -eq 0 ]; then
+            echo "REBOOT_REQUIRED"
+            return 100  # Special code for reboot needed
+        elif [ $mismatch_result -eq 2 ]; then
+            log_error "hid-xpadneo installation failed - kernel header mismatch could not be fixed"
+            echo "$install_output"
+            return 1
+        fi
+    fi
+    
+    # Check if installation failed for other reasons
+    if [ $install_exit_code -ne 0 ]; then
+        log_error "hid-xpadneo installation failed with exit code $install_exit_code"
+        echo "$install_output"
+        return 1
+    fi
+}
+
 # Load kernel modules
 load_modules() {
     log_info "Loading kernel modules..."
@@ -348,6 +416,14 @@ load_modules() {
         
         # Set up autoload
         echo "xpad-noone" > /etc/modules-load.d/xpad-noone.conf
+    fi
+
+    # Load xpadneo
+    if ! lsmod | grep -q hid_xpadneo; then
+        modprobe hid_xpadneo || log_error "Failed to load hid_xpadneo module"
+        
+        # Set up autoload
+        echo "hid_xpadneo" > /etc/modules-load.d/hid_xpadneo.conf
     fi
     
     # Remove conflicting xpad.conf if exists
@@ -383,6 +459,7 @@ main() {
     # Set up repositories
     setup_xone_repo
     setup_xpad_noone_repo
+    setup_xpadneo_repo
     
     # Install drivers
     install_xone
@@ -397,6 +474,17 @@ main() {
     fi
     
     install_xpad_noone
+    local xpad_result=$?
+    if [ $xpad_result -eq 100 ]; then
+        log_info "Kernel upgraded, reboot required"
+        echo "REBOOT_REQUIRED"
+        exit 100
+    elif [ $xpad_result -ne 0 ]; then
+        log_error "xpad-noone installation failed"
+        exit 1
+    fi
+
+    install_xpadneo
     local xpad_result=$?
     if [ $xpad_result -eq 100 ]; then
         log_info "Kernel upgraded, reboot required"

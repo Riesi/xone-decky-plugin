@@ -8,6 +8,7 @@ set -e
 XONE_LOCAL_REPO="/home/deck/repos/xone"
 XPAD_NOONE_LOCAL_REPO="/home/deck/repos/xpad-noone"
 XPAD_NOONE_VERSION="1.0"
+XPADNEO_LOCAL_REPO="/home/deck/repos/xpadneo"
 
 # ============================================================================
 # Helper Functions
@@ -108,6 +109,45 @@ uninstall_xpad_noone() {
     log_info "xpad-noone driver uninstalled"
 }
 
+# Uninstall xpadneo driver
+uninstall_xpadneo() {
+    log_info "Uninstalling hid-xpadneo driver..."
+    
+    # Unload modules
+    local modules
+    modules=$(lsmod | grep '^hid-xpadneo' | cut -d ' ' -f 1 | tr '\n' ' ')
+    if [ -n "$modules" ]; then
+        log_info "Unloading hid-xpadneo modules: $modules"
+        modprobe -r -a $modules 2>/dev/null || true
+    fi
+    
+    # Remove via DKMS
+    if dkms status hid-xpadneo >/dev/null 2>&1 && [ -n "$(dkms status hid-xpadneo)" ]; then
+        log_info "Removing hid-xpadneo from DKMS..."
+        
+        # Get installed version
+        local version
+        version=$(dkms status xone 2>/dev/null | head -1 | grep -oP '\d+\.\d+\.\d+' || echo "")
+        
+        if [ -n "$version" ]; then
+            dkms remove -m hid-xpadneo -v "$version" --all 2>/dev/null || true
+            rm -rf "/usr/src/hid-xpadneo-$version" 2>/dev/null || true
+        fi
+    fi
+    
+    # Run uninstall script if available
+    if [ -d "$XPADNEO_LOCAL_REPO" ] && [ -f "$XPADNEO_LOCAL_REPO/uninstall.sh" ]; then
+        log_info "Running hid-xpadneo uninstall script..."
+        cd "$XPADNEO_LOCAL_REPO"
+        ./uninstall.sh 2>/dev/null || true
+    fi
+    
+    # Remove autoload config
+    rm -f /etc/modules-load.d/hid-xpadneo.conf
+    
+    log_info "hid-xpadneo driver uninstalled"
+}
+
 # Clean up repositories (optional)
 cleanup_repos() {
     log_info "Cleaning up repository directories..."
@@ -120,6 +160,11 @@ cleanup_repos() {
     if [ -d "$XPAD_NOONE_LOCAL_REPO" ]; then
         rm -rf "$XPAD_NOONE_LOCAL_REPO"
         log_info "Removed xpad-noone repository"
+    fi
+    
+    if [ -d "$XPADNEO_LOCAL_REPO" ]; then
+        rm -rf "$XPADNEO_LOCAL_REPO"
+        log_info "Removed xpadneo repository"
     fi
     
     # Remove parent dir if empty
@@ -143,6 +188,7 @@ main() {
     # Uninstall drivers
     uninstall_xone
     uninstall_xpad_noone
+    uninstall_xpadneo
     
     # Clean up repos
     cleanup_repos

@@ -14,6 +14,9 @@ XPAD_NOONE_LOCAL_REPO = "/home/deck/repos/xpad-noone"
 XONE_REMOTE_REPO = "https://github.com/dlundqvist/xone"
 XPAD_NOONE_REMOTE_REPO = "https://github.com/forkymcforkface/xpad-noone"
 XPAD_NOONE_VERSION = "1.0"
+XPADNEO_LOCAL_REPO = "/home/deck/repos/xpadneo"
+XPADNEO_REMOTE_REPO = "https://github.com/atar-axis/xpadneo.git"
+
 
 REQUIRED_PACKAGES = [
     "curl",
@@ -25,6 +28,8 @@ REQUIRED_PACKAGES = [
     "libisl",
     "libmpc",
     "plymouth",
+    "bluez",
+    "bluez-utils",
 ]
 
 
@@ -67,7 +72,7 @@ class Plugin:
     # =========================================================================
 
     async def get_install_status(self) -> dict:
-        """Check if xone and xpad-noone drivers are installed"""
+        """Check if xone, xpad-noone and xpadneo drivers are installed"""
         # Read version from plugin.json first - this is unrelated to dkms/driver
         # state and must stay correct even if dkms is missing (e.g. wiped by a
         # SteamOS update), otherwise check_for_updates() sees a fake "0.0.0" and
@@ -86,6 +91,7 @@ class Plugin:
 
         xone_installed = False
         xpad_installed = False
+        xpadneo_installed = False
         error = None
         try:
             env = get_clean_env()
@@ -99,6 +105,12 @@ class Plugin:
                 text=True,
                 env=env,
             )
+            xpadneo_result = subprocess.run(
+                ["dkms", "status", "xpadneo"],
+                capture_output=True,
+                text=True,
+                env=env,
+            )
 
             # Log the results for debugging
             decky.logger.info(
@@ -107,13 +119,17 @@ class Plugin:
             decky.logger.info(
                 f"dkms status xpad-noone: stdout='{xpad_result.stdout.strip()}' stderr='{xpad_result.stderr.strip()}' rc={xpad_result.returncode}"
             )
+            decky.logger.info(
+                f"dkms status xpadneo: stdout='{xpadneo_result.stdout.strip()}' stderr='{xpadneo_result.stderr.strip()}' rc={xpadneo_result.returncode}"
+            )
 
             # Check for "installed" in the output (more reliable than just checking if non-empty)
             xone_installed = "installed" in xone_result.stdout.lower()
             xpad_installed = "installed" in xpad_result.stdout.lower()
+            xpadneo_installed = "installed" in xpadneo_result.stdout.lower()
 
             decky.logger.info(
-                f"Install status: xone={xone_installed}, xpad={xpad_installed}"
+                f"Install status: xone={xone_installed}, xpad={xpad_installed}, xpadneo={xpadneo_installed}"
             )
         except Exception as e:
             # dkms missing (e.g. SteamOS update wiped the rootfs) means the
@@ -125,7 +141,8 @@ class Plugin:
         result = {
             "xone_installed": xone_installed,
             "xpad_installed": xpad_installed,
-            "fully_installed": xone_installed and xpad_installed,
+            "xpadneo_installed": xpadneo_installed,
+            "fully_installed": xone_installed and xpad_installed and xpadneo_installed,
             "version": version,
         }
         if error:
@@ -204,7 +221,7 @@ class Plugin:
 
             # Fetch latest release from GitHub
             # Use curl to avoid SSL issues and handle environment cleaning
-            url = "https://api.github.com/repos/SavageCore/xone-decky-plugin/releases/latest"
+            url = "https://api.github.com/repos/Riesi/xone-decky-plugin/releases/latest"
             result = subprocess.run(
                 ["curl", "-s", "-H", "Accept: application/vnd.github.v3+json", url],
                 capture_output=True,
@@ -480,7 +497,7 @@ class Plugin:
     # =========================================================================
 
     async def install_drivers(self) -> dict:
-        """Install xone and xpad-noone drivers"""
+        """Install xone, xpad-noone and xpadneo drivers"""
         try:
             decky.logger.info("Starting driver installation...")
 
@@ -533,7 +550,7 @@ class Plugin:
             return {"success": False, "error": str(e)}
 
     async def uninstall_drivers(self) -> dict:
-        """Uninstall xone and xpad-noone drivers"""
+        """Uninstall xone, xpad-noone and xpadneo drivers"""
         try:
             decky.logger.info("Starting driver uninstallation...")
 
